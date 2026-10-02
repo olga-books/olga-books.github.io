@@ -3,132 +3,167 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Личный кабинет читателя</title>
+    <title>Книжный маркетплейс — Активация по ключу</title>
     <style>
-        * { box-sizing: border-box; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: Arial, sans-serif;
-            background-color: #f4f4f9;
-            margin: 0;
-            padding: 20px;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            background: linear-gradient(135deg, #eef2ff 0%, #f4f4f9 100%);
+            min-height: 100vh;
             display: flex;
             justify-content: center;
             align-items: center;
-            min-height: 100vh;
+            padding: 20px;
         }
 
         .card {
             background: white;
-            padding: 30px;
-            border-radius: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
-            text-align: center;
-            max-width: 500px;
+            padding: 40px 30px;
+            border-radius: 16px;
+            box-shadow: 0 10px 40px rgba(0, 91, 255, 0.08);
+            max-width: 480px;
             width: 100%;
-            transition: all 0.3s ease;
+            text-align: center;
+            transition: all 0.35s cubic-bezier(0.4, 0, 0.2, 1);
         }
 
-        /* Элегантно расширяем личный кабинет, когда доступ получен */
         .card.expanded {
-            max-width: 900px;
-            height: 85vh;
+            max-width: 1000px;
+            height: 88vh;
             display: flex;
             flex-direction: column;
             text-align: left;
+            padding: 25px 30px;
         }
 
-        h1 { color: #005bff; font-size: 22px; margin: 0 0 10px; }
-        p  { color: #666; font-size: 14px; margin: 0 0 20px; }
+        .logo { font-size: 44px; margin-bottom: 12px; line-height: 1; }
+
+        h1 { color: #1a1d29; font-size: 24px; margin-bottom: 8px; letter-spacing: -0.3px; }
+        h2 { color: #1a1d29; font-size: 19px; margin-bottom: 10px; }
+
+        .subtitle { color: #6b7280; font-size: 14px; line-height: 1.5; margin-bottom: 28px; }
 
         input[type="text"] {
-            width: 85%;
-            padding: 12px;
-            border: 2px solid #ddd;
-            border-radius: 5px;
-            font-size: 16px;
+            width: 100%;
+            padding: 15px 18px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            font-size: 17px;
             text-align: center;
-            margin-bottom: 15px;
+            letter-spacing: 2px;
+            font-family: "SF Mono", Consolas, monospace;
+            text-transform: uppercase;
             outline: none;
-            transition: border-color 0.2s;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            margin-bottom: 14px;
         }
-        input[type="text"]:focus { border-color: #005bff; }
+        input[type="text"]:focus {
+            border-color: #005bff;
+            box-shadow: 0 0 0 4px rgba(0, 91, 255, 0.08);
+        }
 
         button {
-            background-color: #005bff;
+            background: #005bff;
             color: white;
             border: none;
-            padding: 12px 25px;
-            border-radius: 5px;
+            padding: 15px 25px;
+            border-radius: 10px;
             font-size: 16px;
-            font-weight: bold;
+            font-weight: 600;
             cursor: pointer;
-            width: 92%;
-            transition: background-color 0.2s;
+            width: 100%;
+            transition: background 0.2s, transform 0.05s;
         }
-        button:hover:not(:disabled) { background-color: #0045c7; }
-        button:disabled { background-color: #9db8ff; cursor: wait; }
+        button:hover:not(:disabled) { background: #0045c7; }
+        button:active:not(:disabled) { transform: translateY(1px); }
+        button:disabled { background: #9db8ff; cursor: wait; }
 
-        .result { margin-top: 20px; font-size: 15px; font-weight: bold; min-height: 20px; }
-        .success { color: #2ed573; }
-        .error   { color: #ff4757; }
+        .result {
+            margin-top: 18px;
+            font-size: 14px;
+            font-weight: 500;
+            min-height: 20px;
+            line-height: 1.5;
+        }
+        .error   { color: #ef4444; }
+        .success { color: #10b981; }
         .info    { color: #005bff; }
 
-        /* Зона личного кабинета с книгой */
+        /* Экран книги */
         #book-area {
             display: none;
             flex-direction: column;
             flex-grow: 1;
             height: 100%;
-            margin-top: 10px;
             min-height: 0;
         }
 
-        #book-area h1 { font-size: 20px; margin: 0 0 10px; }
+        .book-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .book-title { font-size: 19px; font-weight: 700; color: #1a1d29; }
 
         .download-btn {
-            display: inline-block;
-            background-color: #2ed573;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: #10b981;
             color: white;
             text-decoration: none;
-            padding: 12px 20px;
-            border-radius: 5px;
-            font-weight: bold;
-            margin-bottom: 12px;
-            align-self: center;
-            transition: background-color 0.2s;
+            padding: 11px 18px;
+            border-radius: 9px;
+            font-weight: 600;
+            font-size: 14px;
+            transition: background 0.2s;
         }
-        .download-btn:hover { background-color: #26af5f; }
+        .download-btn:hover { background: #059669; }
 
-        /* Удобный адаптивный плеер для чтения PDF онлайн */
         .pdf-viewer {
             flex-grow: 1;
             width: 100%;
-            border: 1px solid #ddd;
-            border-radius: 5px;
-            background: #eee;
-            min-height: 450px;
+            border: 1px solid #e5e7eb;
+            border-radius: 10px;
+            background: #f9fafb;
+            min-height: 400px;
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #9ca3af;
+            margin-top: 14px;
+            text-align: center;
         }
     </style>
 </head>
 <body>
 
     <div class="card" id="main-card">
-        <!-- Экран 1: Ввод номера заказа -->
+        <!-- Экран 1: Ввод ключа -->
         <div id="auth-area">
-            <h1>📚 Личный кабинет читателя</h1>
-            <p>Введите номер отправления (заказа) из личного кабинета OZON для проверки доступа.</p>
+            <div class="logo">📚</div>
+            <h1>Активация книги</h1>
+            <p class="subtitle">Введите ключ активации, который вы получили после покупки. Ключ действует однократно.</p>
 
-            <input type="text" id="order-input" placeholder="Например: 12345678-0001-1" autocomplete="off">
+            <input type="text" id="key-input" placeholder="XXXX-XXXX-XXXX" autocomplete="off" maxlength="19" spellcheck="false">
             <button id="check-btn">Открыть книгу</button>
 
             <div id="result-message" class="result"></div>
+            <div class="hint">Не нашли ключ? Проверьте письмо или чек покупки.</div>
         </div>
 
-        <!-- Экран 2: Онлайн-чтение и скачивание книги -->
+        <!-- Экран 2: Книга -->
         <div id="book-area">
-            <h1>📖 Приятного чтения!</h1>
-            <a href="" id="link-download" target="_blank" rel="noopener" class="download-btn">⬇️ Скачать книгу на устройство</a>
+            <div class="book-header">
+                <div class="book-title" id="book-title">📖 Приятного чтения!</div>
+                <a href="" id="link-download" target="_blank" rel="noopener" class="download-btn">⬇️ Скачать PDF</a>
+            </div>
             <iframe src="" id="pdf-frame" class="pdf-viewer" frameborder="0" allow="autoplay"></iframe>
         </div>
     </div>
@@ -151,90 +186,101 @@
         const app = initializeApp(firebaseConfig);
         const db  = getDatabase(app);
 
-        const input       = document.getElementById('order-input');
-        const btn         = document.getElementById('check-btn');
-        const resultDiv   = document.getElementById('result-message');
-        const mainCard    = document.getElementById('main-card');
-        const authArea    = document.getElementById('auth-area');
-        const bookArea    = document.getElementById('book-area');
-        const linkDownload= document.getElementById('link-download');
-        const pdfFrame    = document.getElementById('pdf-frame');
+        const input        = document.getElementById('key-input');
+        const btn          = document.getElementById('check-btn');
+        const resultDiv    = document.getElementById('result-message');
+        const mainCard     = document.getElementById('main-card');
+        const authArea     = document.getElementById('auth-area');
+        const bookArea     = document.getElementById('book-area');
+        const linkDownload = document.getElementById('link-download');
+        const pdfFrame     = document.getElementById('pdf-frame');
+        const bookTitleEl  = document.getElementById('book-title');
 
-        /**
-         * Преобразует ссылку Google Drive /view в прямые ссылки:
-         *  - для встраивания (iframe)  → /preview
-         *  - для скачивания            → /uc?export=download&id=...
-         * Если ссылка не с Google Drive — возвращает её как есть.
-         */
+        // ---- Автоформатирование ключа: XXXX-XXXX-XXXX ----
+        input.addEventListener('input', () => {
+            let v = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+            v = v.slice(0, 12);
+            input.value = v.match(/.{1,4}/g)?.join('-') || '';
+        });
+
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') btn.click();
+        });
+
+        // ---- Преобразование ссылок Google Drive ----
         function buildViewerUrls(url) {
-            const gdMatch = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
-            if (gdMatch) {
-                const id = gdMatch[1];
+            const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
+            if (m) {
+                const id = m[1];
                 return {
                     preview:  `https://drive.google.com/file/d/${id}/preview`,
                     download: `https://drive.google.com/uc?export=download&id=${id}`
                 };
             }
-            // Обычная ссылка (Firebase Storage и т.п.) — используем напрямую
             return { preview: url, download: url };
         }
 
+        // ---- Основная логика активации ----
         btn.addEventListener('click', async () => {
-            const rawOrder = input.value.trim();
+            const rawKey = input.value.trim().toUpperCase();
 
-            if (!rawOrder) {
-                resultDiv.innerHTML = '<span class="error">Пожалуйста, введите номер заказа!</span>';
+            if (rawKey.length < 12) {
+                resultDiv.innerHTML = '<span class="error">Введите полный ключ (12 символов).</span>';
                 return;
             }
 
-            // ВАЖНО: не преобразуем дефисы в подчёркивания — ключи в Firebase
-            // должны совпадать с тем, что вы реально записали в allowed_orders.
-            const orderNumber = rawOrder;
-
-            resultDiv.innerHTML = '<span class="info">Авторизация читателя... Проверяем базу.</span>';
+            resultDiv.innerHTML = '<span class="info">Проверяем ключ...</span>';
             btn.disabled = true;
 
             try {
-                // 1. Ищем заказ
-                const orderRef = ref(db, `allowed_orders/${orderNumber}`);
-                const snapshot = await get(orderRef);
+                // 1. Ищем ключ
+                const keyRef = ref(db, `keys/${rawKey}`);
+                const keySnap = await get(keyRef);
 
-                if (!snapshot.exists()) {
-                    resultDiv.innerHTML = '<span class="error">Номер заказа не найден. Попробуйте через 15–30 минут после получения посылки.</span>';
+                if (!keySnap.exists()) {
+                    resultDiv.innerHTML = '<span class="error">Ключ не найден. Проверьте правильность ввода.</span>';
                     return;
                 }
 
-                const orderData = snapshot.val();
+                const keyData = keySnap.val();
 
-                // 2. Защита от повторного использования
-                if (orderData.used === true) {
-                    resultDiv.innerHTML = '<span class="error">По этому номеру заказа книга уже была открыта! Доступ заблокирован.</span>';
+                // 2. Проверяем, не использован ли
+                if (keyData.used === true) {
+                    resultDiv.innerHTML = '<span class="error">Этот ключ уже активирован. Один ключ — одна книга.</span>';
                     return;
                 }
 
-                // 3. Получаем секретную ссылку на книгу из Firebase
-                const urlSnapshot = await get(ref(db, 'book_settings/url'));
-                if (!urlSnapshot.exists() || !urlSnapshot.val()) {
-                    resultDiv.innerHTML = '<span class="error">Ошибка: ссылка на книгу не настроена (узел book_settings/url).</span>';
+                // 3. Получаем информацию о книге
+                if (!keyData.book_id) {
+                    resultDiv.innerHTML = '<span class="error">Ошибка конфигурации: у ключа не указан book_id.</span>';
                     return;
                 }
 
-                const secretBookUrl = urlSnapshot.val();
-                const urls = buildViewerUrls(secretBookUrl);
+                const bookRef = ref(db, `books/${keyData.book_id}`);
+                const bookSnap = await get(bookRef);
 
-                // 4. Блокируем заказ
-                await update(orderRef, {
+                if (!bookSnap.exists()) {
+                    resultDiv.innerHTML = '<span class="error">Ошибка: книга не найдена в базе.</span>';
+                    return;
+                }
+
+                const book = bookSnap.val();
+                const urls = buildViewerUrls(book.url);
+
+                // 4. Активируем ключ (атомарно, один раз)
+                await update(keyRef, {
                     used: true,
-                    activated_at: new Date().toISOString()
+                    used_at: new Date().toISOString()
                 });
 
-                // 5. Переключаем кабинет в режим чтения
-                authArea.style.display  = 'none';
-                bookArea.style.display  = 'flex';
+                // 5. Показываем книгу
+                authArea.style.display = 'none';
+                bookArea.style.display = 'flex';
                 mainCard.classList.add('expanded');
 
+                bookTitleEl.textContent = `📖 ${book.title || 'Приятного чтения!'}`;
                 linkDownload.href = urls.download;
-                pdfFrame.src      = urls.preview;
+                pdfFrame.src = urls.preview;
 
             } catch (error) {
                 console.error(error);
@@ -242,11 +288,6 @@
             } finally {
                 btn.disabled = false;
             }
-        });
-
-        // Удобство: Enter в поле ввода = нажатие кнопки
-        input.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') btn.click();
         });
     </script>
 </body>
