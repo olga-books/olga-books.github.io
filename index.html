@@ -1,1 +1,138 @@
-rjfh
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Получить книгу по заказу OZON</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f9;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .card {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%;
+        }
+        h1 { color: #005bff; font-size: 22px; margin-bottom: 10px; }
+        p { color: #666; font-size: 14px; margin-bottom: 20px; }
+        input[type="text"] {
+            width: 85%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        button {
+            background-color: #005bff;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 5px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            width: 92%;
+        }
+        button:hover { background-color: #0045c7; }
+        .result { margin-top: 20px; font-size: 15px; font-weight: bold; }
+        .success { color: #2ed573; }
+        .error { color: #ff4757; }
+        .download-btn {
+            display: inline-block;
+            background-color: #2ed573;
+            color: white;
+            text-decoration: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            margin-top: 15px;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <h1>📚 Выдача книги по номеру заказа</h1>
+        <p>Введите номер отправления (заказа) из личного кабинета OZON.</p>
+        
+        <input type="text" id="order-input" placeholder="Например: 12345678-0001-1">
+        <button id="check-btn">Получить книгу</button>
+        
+        <div id="result-message" class="result"></div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://gstatic.com";
+        import { getDatabase, ref, get, update } from "https://gstatic.com";
+
+        // Ваша конфигурация Firebase "Путь до богатства"
+        const firebaseConfig = {
+            apiKey: "AIzaSyADDsFRF3Dwewv8MqcbQrRMZESK3CoG5AU",
+            authDomain: "://firebaseapp.com",
+            databaseURL: "https://firebasedatabase.app",
+            projectId: "put-do-bogatstva",
+            storageBucket: "put-do-bogatstva.firebasestorage.app",
+            messagingSenderId: "317422748511",
+            appId: "1:317422748511:web:26395f5579d8748838ecea"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const input = document.getElementById('order-input');
+        const btn = document.getElementById('check-btn');
+        const resultDiv = document.getElementById('result-message');
+        const BOOK_URL = 'https://xn------5cdbbbhg5a2ckbkwwe1ba3m3b.ru'; // Ссылка на скачивание книги
+
+        btn.addEventListener('click', async () => {
+            // Заменяем точку на дефис/подчеркивание, так как Firebase не любит точки в путях
+            const orderNumber = input.value.trim().replace('.', '_');
+            
+            if (!orderNumber) {
+                resultDiv.innerHTML = '<span class="error">Введите номер заказа!</span>';
+                return;
+            }
+
+            resultDiv.innerHTML = 'Проверяем номер в базе...';
+
+            try {
+                const orderRef = ref(db, `allowed_orders/${orderNumber}`);
+                const snapshot = await get(orderRef);
+
+                if (snapshot.exists()) {
+                    const orderData = snapshot.val();
+
+                    if (orderData.used === true) {
+                        resultDiv.innerHTML = '<span class="error">По этому номеру заказа книга уже была скачана!</span>';
+                    } else {
+                        // Отмечаем, что заказ использован
+                        await update(orderRef, { used: true, activated_at: new Date().toISOString() });
+                        
+                        resultDiv.innerHTML = `
+                            <span class="success">Заказ подтвержден!</span><br>
+                            <a href="${BOOK_URL}" target="_blank" class="download-btn">⬇️ Скачать книгу</a>
+                        `;
+                    }
+                } else {
+                    resultDiv.innerHTML = '<span class="error">Номер заказа не найден или еще обрабатывается OZON. Попробуйте через 15-30 минут после получения.</span>';
+                }
+            } catch (error) {
+                console.error(error);
+                resultDiv.innerHTML = '<span class="error">Ошибка подключения к базе.</span>';
+            }
+        });
+    </script>
+</body>
+</html>
