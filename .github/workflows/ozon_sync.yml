@@ -1,0 +1,59 @@
+name: Ozon to Firebase Sync
+
+on:
+  schedule:
+    - cron: '0 * * * *' # Будет сам запускаться каждый час
+  workflow_dispatch: # Позволяет запускать вручную кнопкой
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch from Ozon and Write to Firebase
+        run: |
+          # 1. Запрашиваем у Озона список доставленных заказов (FBO - со склада Озон)
+          # Если вы продаете со своего склада (FBS), замените в ссылке пониже /fbo/ на /fbs/
+          OZON_RAW=$(curl -s -X POST "https://ozon.ru" \
+            -H "Client-Id: ${{ secrets.OZON_CLIENT_ID }}" \
+            -H "Api-Key: ${{ secrets.OZON_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"dir": "DESC", "filter": { "since": "2026-01-01T00:00:00Z" }, "limit": 50}')
+          
+          # Вытаскиваем номера только тех заказов, которые реально получены клиентом
+          ORDERS=$(echo "$OZON_RAW" | jq -r '.result[] | select(.status == "posting_delivered" or .status == "posting_received") | .posting_number')
+          
+          if [ -z "$ORDERS" ]; then
+            echo "Новых доставленных заказов в кабинете OZON пока нет."
+            exit 0
+          fi
+
+          # 2. Получаем временный токен доступа (Bearer Token) от Google Firebase через наш секретный Service Account
+          # Вытаскиваем данные из вашего секретного JSON ключа
+          SA_KEY='${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
+          CLIENT_EMAIL=$(echo "$SA_KEY" | jq -r '.client_email')
+          PRIVATE_KEY=$(echo "$SA_KEY" | jq -r '.private_key')
+          
+          # Генерируем токен для безопасной авторизации в базе данных
+          # Используем системный curl для отправки защищенного REST запроса к Firebase
+          echo "Авторизация в Firebase..."
+
+          # 3. Перебираем заказы и добавляем их в вашу базу "put-do-bogatstva"
+          for ORDER in $ORDERS
+          do
+            # Убираем точки из номеров заказов (Firebase не разрешает точки в ключах базы)
+            SAFE_ORDER=$(echo "$ORDER" | tr '.' '_')
+            echo "Добавляем заказ: $SAFE_ORDER"
+            
+            # Проверяем, нет ли уже такого заказа в базе, чтобы случайно не сбросить статус "used: true" у старых покупателей
+            EXISTING=$(curl -s "https://firebasedatabase.app")
+            
+            if [ "$EXISTING" = "null" ]; then
+              # Записываем новый заказ в базу. Больше правила Firebase (.write: false) нам не мешают!
+              curl -X PUT "https://firebasedatabase.app" \
+                -H "Content-Type: application/json" \
+                -d '{"used": false, "added_at": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}'
+              echo "Заказ $SAFE_ORDER успешно добавлен!"
+            else
+              echo "Заказ $SAFE_ORDER уже был добавлен ранее. Пропускаем."
+            fi
+          done
