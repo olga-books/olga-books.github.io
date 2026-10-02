@@ -2,58 +2,55 @@ name: Ozon to Firebase Sync
 
 on:
   schedule:
-    - cron: '0 * * * *' # Будет сам запускаться каждый час
-  workflow_dispatch: # Позволяет запускать вручную кнопкой
+    - cron: '0 * * * *'
+  workflow_dispatch:
 
 jobs:
   sync:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - name: Fetch from Ozon and Write to Firebase
+      - name: Run Sync Script
+        env:
+          OZON_ID: ${{ secrets.OZON_CLIENT_ID }}
+          OZON_KEY: ${{ secrets.OZON_API_KEY }}
         run: |
-          # 1. Запрашиваем у Озона список доставленных заказов (FBO - со склада Озон)
-          # Если вы продаете со своего склада (FBS), замените в ссылке пониже /fbo/ на /fbs/
+          if [ -z "$OZON_ID" ] || [ -z "$OZON_KEY" ]; then
+            echo "Ошибка: Ключи OZON_CLIENT_ID или OZON_API_KEY не найдены в Secrets!"
+            exit 1
+          fi
+
           OZON_RAW=$(curl -s -X POST "https://ozon.ru" \
-            -H "Client-Id: ${{ secrets.OZON_CLIENT_ID }}" \
-            -H "Api-Key: ${{ secrets.OZON_API_KEY }}" \
+            -H "Client-Id: $OZON_ID" \
+            -H "Api-Key: $OZON_KEY" \
             -H "Content-Type: application/json" \
             -d '{"dir": "DESC", "filter": { "since": "2026-01-01T00:00:00Z" }, "limit": 50}')
-          
-          # Вытаскиваем номера только тех заказов, которые реально получены клиентом
-          ORDERS=$(echo "$OZON_RAW" | jq -r '.result[] | select(.status == "posting_delivered" or .status == "posting_received") | .posting_number')
-          
-          if [ -z "$ORDERS" ]; then
-            echo "Новых доставленных заказов в кабинете OZON пока нет."
+
+          if echo "$OZON_RAW" | jq -e '.error' >/dev/null; then
+            echo "Ошибка API OZON:"
+            echo "$OZON_RAW" | jq '.error'
+            exit 1
+          fi
+
+          ORDERS=$(echo "$OZON_RAW" | jq -r '.result[] | select(.status == "posting_delivered" or .status == "posting_received") | .posting_number' 2>/dev/null || true)
+
+          if [ -z "$ORDERS" ] || [ "$ORDERS" = "null" ]; then
+            echo "Новых доставленных заказов в кабинете OZON на данный момент нет."
             exit 0
           fi
 
-          # 2. Получаем временный токен доступа (Bearer Token) от Google Firebase через наш секретный Service Account
-          # Вытаскиваем данные из вашего секретного JSON ключа
-          SA_KEY='${{ secrets.FIREBASE_SERVICE_ACCOUNT }}'
-          CLIENT_EMAIL=$(echo "$SA_KEY" | jq -r '.client_email')
-          PRIVATE_KEY=$(echo "$SA_KEY" | jq -r '.private_key')
-          
-          # Генерируем токен для безопасной авторизации в базе данных
-          # Используем системный curl для отправки защищенного REST запроса к Firebase
-          echo "Авторизация в Firebase..."
-
-          # 3. Перебираем заказы и добавляем их в вашу базу "put-do-bogatstva"
           for ORDER in $ORDERS
           do
-            # Убираем точки из номеров заказов (Firebase не разрешает точки в ключах базы)
             SAFE_ORDER=$(echo "$ORDER" | tr '.' '_')
-            echo "Добавляем заказ: $SAFE_ORDER"
+            echo "Обработка заказа: $SAFE_ORDER"
             
-            # Проверяем, нет ли уже такого заказа в базе, чтобы случайно не сбросить статус "used: true" у старых покупателей
             EXISTING=$(curl -s "https://firebasedatabase.app")
             
             if [ "$EXISTING" = "null" ]; then
-              # Записываем новый заказ в базу. Больше правила Firebase (.write: false) нам не мешают!
-              curl -X PUT "https://firebasedatabase.app" \
+              curl -s -X PUT "https://firebasedatabase.app" \
                 -H "Content-Type: application/json" \
-                -d '{"used": false, "added_at": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}'
-              echo "Заказ $SAFE_ORDER успешно добавлен!"
+                -d '{"used": false, "added_at": "'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > /dev/null
+              echo "Заказ $SAFE_ORDER успешно синхронизирован с Firebase!"
             else
-              echo "Заказ $SAFE_ORDER уже был добавлен ранее. Пропускаем."
+              echo "Заказ $SAFE_ORDER уже есть в базе. Пропускаем."
             fi
           done
