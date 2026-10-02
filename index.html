@@ -8,6 +8,7 @@
     * { box-sizing: border-box; }
     body { font-family: Arial, sans-serif; background: #f4f4f9; margin: 0; color: #222; }
 
+    /* ===== Верхняя панель ===== */
     .topbar {
         display: flex; align-items: center; justify-content: space-between;
         background: white; padding: 12px 24px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);
@@ -25,7 +26,7 @@
     .key-box { display: flex; gap: 6px; align-items: center; }
     .key-box input {
         width: 230px; padding: 8px 10px; border: 2px solid #ddd; border-radius: 6px;
-        font-size: 14px; outline: none;
+        font-size: 14px; outline: none; transition: border-color 0.2s;
     }
     .key-box input:focus { border-color: #005bff; }
     .key-box button {
@@ -35,12 +36,14 @@
     .key-box button:hover:not(:disabled) { background: #0045c7; }
     .key-box button:disabled { background: #9db8ff; cursor: wait; }
 
+    /* ===== Контейнер ===== */
     .container { max-width: 1100px; margin: 30px auto; padding: 0 20px; }
     .section { display: none; }
     .section.active { display: block; }
     h2 { color: #005bff; font-size: 22px; margin: 0 0 6px; }
     .subtitle { color: #666; font-size: 14px; margin: 0 0 22px; }
 
+    /* ===== Сетка книг ===== */
     .books-grid {
         display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 18px;
     }
@@ -64,20 +67,29 @@
     .book-author { font-size: 13px; color: #777; margin: 0; }
     .book-desc { font-size: 12px; color: #555; margin: 4px 0 8px; flex-grow: 1; }
     .book-actions { display: flex; gap: 6px; margin-top: auto; }
+    .book-actions > * { flex: 1; }
     .book-actions button {
-        flex: 1; padding: 8px 10px; border-radius: 6px; border: none; font-size: 13px;
+        padding: 8px 10px; border-radius: 6px; border: none; font-size: 13px;
         font-weight: bold; cursor: pointer;
     }
     .btn-read { background: #005bff; color: white; }
     .btn-read:hover { background: #0045c7; }
-    .btn-locked { background: #eef1f7; color: #8892a8; cursor: not-allowed; }
+    .btn-enter-key { background: #005bff; color: white; }
+    .btn-enter-key:hover { background: #0045c7; }
+    .btn-buy {
+        padding: 8px 10px; border-radius: 6px; background: #2ed573; color: white;
+        font-size: 13px; font-weight: bold; text-align: center; text-decoration: none;
+    }
+    .btn-buy:hover { background: #26af5f; }
 
+    /* ===== Пустое состояние ===== */
     .empty {
         background: white; padding: 40px 20px; border-radius: 10px; text-align: center;
         color: #888; box-shadow: 0 4px 12px rgba(0,0,0,0.05);
     }
     .empty .big { font-size: 42px; margin-bottom: 10px; }
 
+    /* ===== Плеер ===== */
     .player {
         background: white; padding: 20px; border-radius: 10px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.08); display: flex; flex-direction: column; height: 82vh;
@@ -100,6 +112,7 @@
         background: #eee; min-height: 400px;
     }
 
+    /* ===== Уведомления ===== */
     .toast {
         position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(120%);
         background: #222; color: white; padding: 12px 20px; border-radius: 8px;
@@ -120,6 +133,7 @@
 </head>
 <body>
 
+<!-- ===== Верхняя панель ===== -->
 <div class="topbar">
     <div class="brand">📚 Мой кабинет</div>
     <div class="nav">
@@ -132,6 +146,7 @@
     </div>
 </div>
 
+<!-- ===== Контент ===== -->
 <div class="container">
     <section id="tab-shop" class="section active">
         <h2>🛍 Магазин</h2>
@@ -179,6 +194,7 @@
     const app = initializeApp(firebaseConfig);
     const db  = getDatabase(app);
 
+    /* ===== DOM ===== */
     const keyInput    = document.getElementById('key-input');
     const keyBtn      = document.getElementById('key-btn');
     const shopGrid    = document.getElementById('shop-grid');
@@ -189,9 +205,11 @@
     const readerBack  = document.getElementById('reader-back');
     const toastEl     = document.getElementById('toast');
 
+    /* ===== Состояние ===== */
     let allBooks = [];
-    let myBooks  = loadMyBooks();
+    let myBooks  = [];   // заполним сразу при старте из localStorage
 
+    /* ===== Утилиты ===== */
     function toast(msg, type = '') {
         toastEl.textContent = msg;
         toastEl.className = 'toast show ' + type;
@@ -205,6 +223,7 @@
         }[c]));
     }
 
+    /** Google Drive /view → /preview (чтение) и /uc?export=download (скачивание) */
     function buildViewerUrls(url) {
         if (!url) return { preview: '', download: '' };
         const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
@@ -227,29 +246,31 @@
         localStorage.setItem('my_books', JSON.stringify(myBooks));
     }
 
-    /* ==== Загрузка каталога книг из узла "books" (как у вас в базе) ==== */
+    /* ===== Загрузка каталога из Firebase ===== */
     async function loadBooks() {
         try {
             const snap = await get(ref(db, 'books'));
-            if (!snap.exists()) {
-                allBooks = [];
-            } else {
+            if (!snap.exists()) { allBooks = []; }
+            else {
                 const data = snap.val();
                 allBooks = Object.entries(data).map(([id, b]) => ({ id, ...b }));
             }
-            renderShop();
         } catch (e) {
             console.error(e);
-            shopGrid.innerHTML = `<div class="empty"><div class="big">⚠️</div>Ошибка загрузки магазина: ${escapeHtml(e.message)}</div>`;
+            toast('Ошибка загрузки каталога: ' + e.message, 'err');
         }
     }
 
+    /* ===== Рендер ===== */
     function renderShop() {
         if (!allBooks.length) {
             shopGrid.innerHTML = `<div class="empty"><div class="big">📭</div>В каталоге пока нет книг.</div>`;
             return;
         }
-        shopGrid.innerHTML = allBooks.map(b => bookCardHtml(b, false)).join('');
+        shopGrid.innerHTML = allBooks.map(b => {
+            const bought = !!myBooks.find(m => m.id === b.id);
+            return bookCardHtml(b, bought);
+        }).join('');
         bindBookButtons(shopGrid);
     }
 
@@ -266,9 +287,19 @@
         const cover = book.cover ? `style="background-image:url('${escapeHtml(book.cover)}')"` : '';
         const badge = isMine ? '<div class="book-badge">✅ Куплено</div>' : '';
         const icon  = !book.cover ? '<span>📕</span>' : '';
-        const actions = isMine
-            ? `<button class="btn-read" data-read="${escapeHtml(book.id)}">📖 Читать</button>`
-            : `<button class="btn-locked" disabled>🔒 Нужен ключ</button>`;
+
+        let actions;
+        if (isMine) {
+            actions = `<button class="btn-read" data-read="${escapeHtml(book.id)}">📖 Читать</button>`;
+        } else {
+            const buyBtn = book.buy_url
+                ? `<a class="btn-buy" href="${escapeHtml(book.buy_url)}" target="_blank" rel="noopener">🛒 Купить</a>`
+                : '';
+            actions = `
+                ${buyBtn}
+                <button class="btn-enter-key" data-key-focus>🔑 Ввести ключ</button>
+            `;
+        }
 
         return `
             <div class="book-card">
@@ -284,11 +315,20 @@
     }
 
     function bindBookButtons(root) {
-        root.querySelectorAll('[data-read]').forEach(btn => {
-            btn.addEventListener('click', () => openReader(btn.dataset.read));
-        });
+        root.querySelectorAll('[data-read]').forEach(btn =>
+            btn.addEventListener('click', () => openReader(btn.dataset.read)));
+
+        root.querySelectorAll('[data-key-focus]').forEach(btn =>
+            btn.addEventListener('click', () => {
+                keyInput.focus();
+                keyInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                keyInput.style.borderColor = '#005bff';
+                setTimeout(() => keyInput.style.borderColor = '#ddd', 1500);
+                toast('Введите ключ из заказа в поле сверху', '');
+            }));
     }
 
+    /* ===== Чтение ===== */
     function openReader(bookId) {
         const book = myBooks.find(b => b.id === bookId) || allBooks.find(b => b.id === bookId);
         if (!book || !book.url) { toast('Книга не найдена или у неё нет ссылки', 'err'); return; }
@@ -304,7 +344,7 @@
         switchTab('my');
     });
 
-    /* ==== Активация ключа. Ключи лежат в узле "keys" ==== */
+    /* ===== Активация ключа ===== */
     keyBtn.addEventListener('click', activateKey);
     keyInput.addEventListener('keydown', e => { if (e.key === 'Enter') activateKey(); });
 
@@ -326,9 +366,28 @@
 
             const keyData = snap.val();
 
+            /* --- Ключ уже использован: пробуем восстановить книгу --- */
             if (keyData.used === true) {
-                const already = myBooks.find(b => b.activationKey === raw);
-                if (already) {
+                const book = allBooks.find(b => b.id === keyData.book_id);
+                if (book) {
+                    if (!myBooks.find(b => b.id === book.id)) {
+                        myBooks.push({
+                            id: book.id,
+                            title: book.title,
+                            author: book.author,
+                            description: book.description,
+                            cover: book.cover,
+                            url: book.url,
+                            activationKey: raw,
+                            activated_at: new Date().toISOString()
+                        });
+                        saveMyBooks();
+                        renderMy();
+                        renderShop();
+                        toast(`Доступ восстановлен: «${book.title}»`, 'ok');
+                        switchTab('my');
+                        return;
+                    }
                     toast('Ключ уже активирован — книга в «Моих книгах»', 'ok');
                     switchTab('my');
                     return;
@@ -337,6 +396,7 @@
                 return;
             }
 
+            /* --- Новая активация --- */
             const bookId = keyData.book_id;
             if (!bookId) { toast('К ключу не привязана книга', 'err'); return; }
 
@@ -348,25 +408,25 @@
                 used_at: new Date().toISOString()
             });
 
-            const entry = {
-                id: book.id,
-                title: book.title,
-                author: book.author,
-                description: book.description,
-                cover: book.cover,
-                url: book.url,
-                activationKey: raw,
-                activated_at: new Date().toISOString()
-            };
-
             if (!myBooks.find(b => b.id === book.id)) {
-                myBooks.push(entry);
+                myBooks.push({
+                    id: book.id,
+                    title: book.title,
+                    author: book.author,
+                    description: book.description,
+                    cover: book.cover,
+                    url: book.url,
+                    activationKey: raw,
+                    activated_at: new Date().toISOString()
+                });
                 saveMyBooks();
             }
 
             keyInput.value = '';
             toast(`Книга «${book.title}» активирована!`, 'ok');
+
             renderMy();
+            renderShop();     // ← магазин тоже обновляем
             switchTab('my');
 
         } catch (e) {
@@ -378,6 +438,7 @@
         }
     }
 
+    /* ===== Вкладки ===== */
     function switchTab(name) {
         document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
         const map = { shop: 'tab-shop', my: 'tab-my', read: 'tab-read' };
@@ -394,9 +455,12 @@
         });
     });
 
+    /* ===== Старт ===== */
     (async () => {
-        await loadBooks();
+        myBooks = loadMyBooks();     // ★ читаем localStorage ПЕРВЫМ делом
+        await loadBooks();           // грузим каталог
         renderMy();
+        renderShop();                // магазин с учётом уже купленных
     })();
 </script>
 </body>
