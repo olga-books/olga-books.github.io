@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Книжный маркетплейс — Активация по ключу</title>
+    <title>Активация книги по ключу</title>
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -38,10 +38,7 @@
         }
 
         .logo { font-size: 44px; margin-bottom: 12px; line-height: 1; }
-
         h1 { color: #1a1d29; font-size: 24px; margin-bottom: 8px; letter-spacing: -0.3px; }
-        h2 { color: #1a1d29; font-size: 19px; margin-bottom: 10px; }
-
         .subtitle { color: #6b7280; font-size: 14px; line-height: 1.5; margin-bottom: 28px; }
 
         input[type="text"] {
@@ -51,7 +48,7 @@
             border-radius: 10px;
             font-size: 17px;
             text-align: center;
-            letter-spacing: 2px;
+            letter-spacing: 3px;
             font-family: "SF Mono", Consolas, monospace;
             text-transform: uppercase;
             outline: none;
@@ -61,6 +58,15 @@
         input[type="text"]:focus {
             border-color: #005bff;
             box-shadow: 0 0 0 4px rgba(0, 91, 255, 0.08);
+        }
+        input[type="text"].error {
+            border-color: #ef4444;
+            animation: shake 0.3s;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-6px); }
+            75% { transform: translateX(6px); }
         }
 
         button {
@@ -151,7 +157,8 @@
             <h1>Активация книги</h1>
             <p class="subtitle">Введите ключ активации, который вы получили после покупки. Ключ действует однократно.</p>
 
-            <input type="text" id="key-input" placeholder="XXXX-XXXX-XXXX" autocomplete="off" maxlength="19" spellcheck="false">
+            <input type="text" id="key-input" placeholder="XXXX-XXXX-XXXX"
+                   autocomplete="off" maxlength="14" spellcheck="false" inputmode="text">
             <button id="check-btn">Открыть книгу</button>
 
             <div id="result-message" class="result"></div>
@@ -196,18 +203,18 @@
         const pdfFrame     = document.getElementById('pdf-frame');
         const bookTitleEl  = document.getElementById('book-title');
 
-        // ---- Автоформатирование ключа: XXXX-XXXX-XXXX ----
+        // ---- Автоформат ключа: XXXX-XXXX-XXXX ----
         input.addEventListener('input', () => {
-            let v = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-            v = v.slice(0, 12);
+            let v = input.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 12);
             input.value = v.match(/.{1,4}/g)?.join('-') || '';
+            input.classList.remove('error');
         });
 
         input.addEventListener('keydown', (e) => {
             if (e.key === 'Enter') btn.click();
         });
 
-        // ---- Преобразование ссылок Google Drive ----
+        // ---- Ссылки Google Drive → preview + download ----
         function buildViewerUrls(url) {
             const m = url.match(/drive\.google\.com\/file\/d\/([^/]+)/);
             if (m) {
@@ -220,12 +227,13 @@
             return { preview: url, download: url };
         }
 
-        // ---- Основная логика активации ----
+        // ---- Активация ----
         btn.addEventListener('click', async () => {
             const rawKey = input.value.trim().toUpperCase();
 
-            if (rawKey.length < 12) {
-                resultDiv.innerHTML = '<span class="error">Введите полный ключ (12 символов).</span>';
+            if (rawKey.replace(/-/g, '').length !== 12) {
+                input.classList.add('error');
+                resultDiv.innerHTML = '<span class="error">Введите полный ключ из 12 символов.</span>';
                 return;
             }
 
@@ -234,40 +242,40 @@
 
             try {
                 // 1. Ищем ключ
-                const keyRef = ref(db, `keys/${rawKey}`);
+                const keyRef  = ref(db, `keys/${rawKey}`);
                 const keySnap = await get(keyRef);
 
                 if (!keySnap.exists()) {
+                    input.classList.add('error');
                     resultDiv.innerHTML = '<span class="error">Ключ не найден. Проверьте правильность ввода.</span>';
                     return;
                 }
 
                 const keyData = keySnap.val();
 
-                // 2. Проверяем, не использован ли
+                // 2. Проверяем, не активирован ли уже
                 if (keyData.used === true) {
+                    input.classList.add('error');
                     resultDiv.innerHTML = '<span class="error">Этот ключ уже активирован. Один ключ — одна книга.</span>';
                     return;
                 }
 
-                // 3. Получаем информацию о книге
+                // 3. Ищем книгу по book_id
                 if (!keyData.book_id) {
-                    resultDiv.innerHTML = '<span class="error">Ошибка конфигурации: у ключа не указан book_id.</span>';
+                    resultDiv.innerHTML = '<span class="error">Ошибка конфигурации ключа (нет book_id).</span>';
                     return;
                 }
 
-                const bookRef = ref(db, `books/${keyData.book_id}`);
-                const bookSnap = await get(bookRef);
-
+                const bookSnap = await get(ref(db, `books/${keyData.book_id}`));
                 if (!bookSnap.exists()) {
-                    resultDiv.innerHTML = '<span class="error">Ошибка: книга не найдена в базе.</span>';
+                    resultDiv.innerHTML = '<span class="error">Книга не найдена в базе.</span>';
                     return;
                 }
 
                 const book = bookSnap.val();
                 const urls = buildViewerUrls(book.url);
 
-                // 4. Активируем ключ (атомарно, один раз)
+                // 4. Активируем ключ (один раз)
                 await update(keyRef, {
                     used: true,
                     used_at: new Date().toISOString()
@@ -284,7 +292,7 @@
 
             } catch (error) {
                 console.error(error);
-                resultDiv.innerHTML = `<span class="error">Ошибка соединения: ${error.message}</span>`;
+                resultDiv.innerHTML = `<span class="error">Ошибка: ${error.message}</span>`;
             } finally {
                 btn.disabled = false;
             }
